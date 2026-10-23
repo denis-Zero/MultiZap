@@ -41,6 +41,7 @@ li .n{font-weight:600;overflow-wrap:anywhere}li .p{color:var(--mut);font-size:.8
 <label for="lista">Números (um por linha)</label>
 <textarea id="lista" placeholder="(19) 99999-8888&#10;11988887777&#10;5519977776666"></textarea>
 <div class="hint">Um número por linha, com ou sem formatação. Sem código do país, será usado o padrão abaixo.</div>
+<button class="btn sec" id="contatosBtn" style="display:none;width:100%;margin-top:10px">📇 Importar dos contatos do celular</button>
 <div class="row" style="margin-top:10px">
 <div><label for="ddi">Código do país padrão</label><input id="ddi" value="55" inputmode="numeric"></div>
 </div>
@@ -128,6 +129,20 @@ $('limpar').addEventListener('click',function(){
   contatos=[];$('lista').value='';$('msg').value='';save();render();
 });
 ['lista','msg','ddi'].forEach(function(i){$(i).addEventListener('input',save)});
+var cb=$('contatosBtn');
+if('contacts' in navigator&&'ContactsManager' in window){
+  cb.style.display='block';
+  cb.addEventListener('click',function(){
+    navigator.contacts.select(['tel'],{multiple:true}).then(function(sel){
+      var linhas=[];
+      sel.forEach(function(c){if(c.tel&&c.tel[0])linhas.push(c.tel[0])});
+      if(!linhas.length)return;
+      var atual=$('lista').value.trim();
+      $('lista').value=(atual?atual+'\n':'')+linhas.join('\n');
+      save();
+    }).catch(function(){alert('Não foi possível acessar os contatos neste navegador.')});
+  });
+}
 var s=load();
 if(s.lista)$('lista').value=s.lista;
 if(s.msg)$('msg').value=s.msg;
