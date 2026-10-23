@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MultiZap</title>
+<style>
+:root{--bg:#f5f7f6;--card:#fff;--tx:#14211b;--mut:#5d6b64;--bd:#d9e1dd;--ac:#1fa855;--acx:#fff;--ok:#e3f5ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--card:#18211c;--tx:#e8f0ec;--mut:#9aaaa1;--bd:#2a3730;--ac:#2bc56a;--acx:#06210f;--ok:#17301f}}
+:root[data-theme="dark"]{--bg:#0f1512;--card:#18211c;--tx:#e8f0ec;--mut:#9aaaa1;--bd:#2a3730;--ac:#2bc56a;--acx:#06210f;--ok:#17301f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:8px 0 4px}
+p.s{color:var(--mut);margin:0 0 16px;font-size:.92rem}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+label{display:block;font-weight:600;margin-bottom:6px;font-size:.92rem}
+textarea,input{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:10px;font:inherit}
+textarea{min-height:110px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1}
+.btn{display:inline-block;text-align:center;text-decoration:none;cursor:pointer;border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;background:var(--ac);color:var(--acx)}
+.btn.sec{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+.btn.off{opacity:.45;pointer-events:none}
+.hint{color:var(--mut);font-size:.82rem;margin-top:6px}
+ul{list-style:none;margin:10px 0 0;padding:0}
+li{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+li.done{background:var(--ok)}
+li .n{font-weight:600;overflow-wrap:anywhere}li .p{color:var(--mut);font-size:.85rem}
+.bar{height:8px;background:var(--bd);border-radius:99px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .3s}
+.warn{font-size:.82rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>MultiZap 💬</h1>
+<p class="s">Envie sua mensagem para vários WhatsApps, um toque por vez.</p>
+
+<div class="card">
+<label for="lista">Números (um por linha)</label>
+<textarea id="lista" placeholder="(19) 99999-8888&#10;11988887777&#10;5519977776666"></textarea>
+<div class="hint">Um número por linha, com ou sem formatação. Sem código do país, será usado o padrão abaixo.</div>
+<div class="row" style="margin-top:10px">
+<div><label for="ddi">Código do país padrão</label><input id="ddi" value="55" inputmode="numeric"></div>
+</div>
+</div>
+
+<div class="card">
+<label for="msg">Mensagem</label>
+<textarea id="msg" placeholder="Digite sua mensagem"></textarea>
+
+<div class="row" style="margin-top:12px">
+<button class="btn" id="gerar">Gerar lista de envio</button>
+<button class="btn sec" id="limpar">Limpar tudo</button>
+</div>
+</div>
+
+<div class="card" id="envio" hidden>
+<div class="row"><strong id="prog">0 de 0 enviados</strong></div>
+<div class="bar"><i id="barra"></i></div>
+<div class="row">
+<a class="btn" id="prox" href="#" target="_blank" rel="noopener noreferrer">Enviar para o próximo</a>
+<button class="btn sec" id="reset">Reiniciar status</button>
+</div>
+<ul id="ul"></ul>
+<p class="warn">O WhatsApp abre com a mensagem pronta; você confirma o envio no próprio app. Envie apenas a quem aceitou receber suas mensagens: envios em massa não solicitados podem levar ao bloqueio do número.</p>
+</div>
+</main>
+
+<script>
+(function(){
+var K='envioWpp';
+var $=function(i){return document.getElementById(i)};
+var contatos=[];
+function load(){try{return JSON.parse(localStorage.getItem(K))||{}}catch(e){return {}}}
+function save(){try{localStorage.setItem(K,JSON.stringify({lista:$('lista').value,msg:$('msg').value,ddi:$('ddi').value,contatos:contatos}))}catch(e){}}
+
+function parse(){
+  var ddi=($('ddi').value||'').replace(/\D/g,'');
+  var vistos={},out=[];
+  $('lista').value.split(/\r?\n/).forEach(function(l){
+    l=l.trim(); if(!l)return;
+    var d=l.replace(/\D/g,'');
+    if(d.length<8)return;
+    if(d.length<=11&&ddi)d=ddi+d;
+    if(vistos[d])return; vistos[d]=1;
+    out.push({tel:d,ok:false});
+  });
+  return out;
+}
+function link(c){
+  var t=$('msg').value.trim();
+  return 'https://wa.me/'+c.tel+'?text='+encodeURIComponent(t);
+}
+function render(){
+  var ul=$('ul');ul.innerHTML='';
+  var feitos=0,prox=null;
+  contatos.forEach(function(c,i){
+    if(c.ok)feitos++;else if(!prox)prox=c;
+    var li=document.createElement('li');if(c.ok)li.className='done';
+    var d=document.createElement('div');
+    d.innerHTML='<div class="n"></div><div class="p"></div>';
+    d.firstChild.textContent=(c.ok?'✓ ':'')+'+'+c.tel;
+    d.lastChild.textContent=c.ok?'Enviado':'Pendente';
+    var a=document.createElement('a');a.className='btn'+(c.ok?' sec':'');a.textContent=c.ok?'Reenviar':'Enviar';
+    a.href=link(c);a.target='_blank';a.rel='noopener noreferrer';
+    a.addEventListener('click',function(){c.ok=true;save();setTimeout(render,150)});
+    li.appendChild(d);li.appendChild(a);ul.appendChild(li);
+  });
+  $('prog').textContent=feitos+' de '+contatos.length+' enviados';
+  $('barra').style.width=(contatos.length?feitos/contatos.length*100:0)+'%';
+  var p=$('prox');
+  if(prox){p.href=link(prox);p.className='btn';p.textContent='Enviar para o próximo: +'+prox.tel;
+    p.onclick=function(){prox.ok=true;save();setTimeout(render,150)}}
+  else{p.href='#';p.className='btn off';p.textContent='Todos enviados ✓';p.onclick=null}
+  $('envio').hidden=!contatos.length;
+}
+$('gerar').addEventListener('click',function(){
+  if(!$('msg').value.trim()){alert('Escreva a mensagem primeiro.');return}
+  var novos=parse();
+  if(!novos.length){alert('Nenhum número válido encontrado.');return}
+  contatos=novos;save();render();
+});
+$('reset').addEventListener('click',function(){contatos.forEach(function(c){c.ok=false});save();render()});
+$('limpar').addEventListener('click',function(){
+  if(!confirm('Apagar contatos e mensagem?'))return;
+  contatos=[];$('lista').value='';$('msg').value='';save();render();
+});
+['lista','msg','ddi'].forEach(function(i){$(i).addEventListener('input',save)});
+var s=load();
+if(s.lista)$('lista').value=s.lista;
+if(s.msg)$('msg').value=s.msg;
+if(s.ddi)$('ddi').value=s.ddi;
+if(s.contatos&&s.contatos.length){contatos=s.contatos;render()}
+})();
+</script>
+</body>
+</html>
